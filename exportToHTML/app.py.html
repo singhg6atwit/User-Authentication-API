@@ -1,0 +1,95 @@
+<html>
+<head>
+<title>app.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #0033b3;}
+.s1 { color: #080808;}
+.s2 { color: #067d17;}
+.s3 { color: #1750eb;}
+</style>
+</head>
+<body bgcolor="#ffffff">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#c0c0c0" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+app.py</font>
+</center></td></tr></table>
+<pre><span class="s0">from </span><span class="s1">flask </span><span class="s0">import </span><span class="s1">Flask, request, jsonify</span>
+<span class="s0">import </span><span class="s1">jwt</span>
+<span class="s0">import </span><span class="s1">datetime</span>
+<span class="s0">from </span><span class="s1">functools </span><span class="s0">import </span><span class="s1">wraps</span>
+
+<span class="s1">app = Flask(__name__)</span>
+<span class="s1">app.config[</span><span class="s2">'SECRET_KEY'</span><span class="s1">] = </span><span class="s2">'your-secret-key'</span>
+
+<span class="s0">class </span><span class="s1">User:</span>
+    <span class="s0">def </span><span class="s1">__init__(self, id, username, password):</span>
+        <span class="s1">self.id = id</span>
+        <span class="s1">self.username = username</span>
+        <span class="s1">self.password = password</span>
+
+<span class="s1">users = [</span>
+    <span class="s1">User(</span><span class="s3">1</span><span class="s1">, </span><span class="s2">'user1'</span><span class="s1">, </span><span class="s2">'password1'</span><span class="s1">),</span>
+    <span class="s1">User(</span><span class="s3">2</span><span class="s1">, </span><span class="s2">'user2'</span><span class="s1">, </span><span class="s2">'password2'</span><span class="s1">)</span>
+<span class="s1">]</span>
+
+<span class="s0">def </span><span class="s1">token_required(f):</span>
+    <span class="s1">@wraps(f)</span>
+    <span class="s0">def </span><span class="s1">decorated(*args, **kwargs):</span>
+        <span class="s1">token = </span><span class="s0">None</span>
+
+        <span class="s0">if </span><span class="s2">'Authorization' </span><span class="s0">in </span><span class="s1">request.headers:</span>
+            <span class="s1">token = request.headers[</span><span class="s2">'Authorization'</span><span class="s1">]</span>
+
+        <span class="s0">if not </span><span class="s1">token:</span>
+            <span class="s0">return </span><span class="s1">jsonify({</span><span class="s2">'message'</span><span class="s1">: </span><span class="s2">'Token is missing!'</span><span class="s1">}), </span><span class="s3">401</span>
+
+        <span class="s0">try</span><span class="s1">:</span>
+            <span class="s1">data = jwt.decode(token, app.config[</span><span class="s2">'SECRET_KEY'</span><span class="s1">], algorithms=[</span><span class="s2">&quot;HS256&quot;</span><span class="s1">])</span>
+            <span class="s1">current_user = User.query.filter_by(id=data[</span><span class="s2">'id'</span><span class="s1">]).first()</span>
+        <span class="s0">except</span><span class="s1">:</span>
+            <span class="s0">return </span><span class="s1">jsonify({</span><span class="s2">'message'</span><span class="s1">: </span><span class="s2">'Token is invalid!'</span><span class="s1">}), </span><span class="s3">401</span>
+
+        <span class="s0">return </span><span class="s1">f(current_user, *args, **kwargs)</span>
+
+    <span class="s0">return </span><span class="s1">decorated</span>
+
+<span class="s1">@app.route(</span><span class="s2">'/register'</span><span class="s1">, methods=[</span><span class="s2">'POST'</span><span class="s1">])</span>
+<span class="s0">def </span><span class="s1">register():</span>
+    <span class="s1">data = request.get_json()</span>
+
+    <span class="s1">new_user = User(id=len(users)+</span><span class="s3">1</span><span class="s1">, username=data[</span><span class="s2">'username'</span><span class="s1">], password=data[</span><span class="s2">'password'</span><span class="s1">])</span>
+    <span class="s1">users.append(new_user)</span>
+
+    <span class="s0">return </span><span class="s1">jsonify({</span><span class="s2">'message'</span><span class="s1">: </span><span class="s2">'New user created!'</span><span class="s1">})</span>
+
+<span class="s1">@app.route(</span><span class="s2">'/login'</span><span class="s1">)</span>
+<span class="s0">def </span><span class="s1">login():</span>
+    <span class="s1">auth = request.authorization</span>
+
+    <span class="s0">if not </span><span class="s1">auth </span><span class="s0">or not </span><span class="s1">auth.username </span><span class="s0">or not </span><span class="s1">auth.password:</span>
+        <span class="s0">return </span><span class="s1">jsonify({</span><span class="s2">'message'</span><span class="s1">: </span><span class="s2">'Could not verify!'</span><span class="s1">}), </span><span class="s3">401</span>
+
+    <span class="s1">user = User.query.filter_by(username=auth.username).first()</span>
+
+    <span class="s0">if not </span><span class="s1">user:</span>
+        <span class="s0">return </span><span class="s1">jsonify({</span><span class="s2">'message'</span><span class="s1">: </span><span class="s2">'Could not verify!'</span><span class="s1">}), </span><span class="s3">401</span>
+
+    <span class="s0">if </span><span class="s1">user.password == auth.password:</span>
+        <span class="s1">token = jwt.encode({</span><span class="s2">'id'</span><span class="s1">: user.id, </span><span class="s2">'exp'</span><span class="s1">: datetime.datetime.utcnow() + datetime.timedelta(minutes=</span><span class="s3">30</span><span class="s1">)}, app.config[</span><span class="s2">'SECRET_KEY'</span><span class="s1">], algorithm=</span><span class="s2">'HS256'</span><span class="s1">)</span>
+
+        <span class="s0">return </span><span class="s1">jsonify({</span><span class="s2">'token'</span><span class="s1">: token})</span>
+
+    <span class="s0">return </span><span class="s1">jsonify({</span><span class="s2">'message'</span><span class="s1">: </span><span class="s2">'Could not verify!'</span><span class="s1">}), </span><span class="s3">401</span>
+
+<span class="s1">@app.route(</span><span class="s2">'/logout'</span><span class="s1">)</span>
+<span class="s1">@token_required</span>
+<span class="s0">def </span><span class="s1">logout(current_user):</span>
+    <span class="s0">return </span><span class="s1">jsonify({</span><span class="s2">'message'</span><span class="s1">: </span><span class="s2">'Logged out!'</span><span class="s1">})</span>
+
+<span class="s0">if </span><span class="s1">__name__ == </span><span class="s2">'__main__'</span><span class="s1">:</span>
+    <span class="s1">app.run(debug=</span><span class="s0">True</span><span class="s1">)</span>
+</pre>
+</body>
+</html>
